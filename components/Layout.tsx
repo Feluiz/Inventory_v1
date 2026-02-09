@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { Role, Brand, User } from '../types';
-import { BRANDS, BRAND_COLORS } from '../constants';
+import { Role, Brand, User, Location } from '../types';
+import { BRANDS, BRAND_COLORS, LOCATIONS } from '../constants';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -9,6 +9,8 @@ interface LayoutProps {
   onLogout: () => void;
   activeBrand: Brand;
   setActiveBrand: (brand: Brand) => void;
+  activeLocation: Location;
+  setActiveLocation: (location: Location) => void;
   currentView: string;
   setCurrentView: (view: string) => void;
 }
@@ -19,6 +21,8 @@ const Layout: React.FC<LayoutProps> = ({
   onLogout, 
   activeBrand, 
   setActiveBrand,
+  activeLocation,
+  setActiveLocation,
   currentView,
   setCurrentView
 }) => {
@@ -92,13 +96,41 @@ const Layout: React.FC<LayoutProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
-            <div className="text-right">
-              <p className="text-sm font-bold text-gray-900 leading-tight">{user.name}</p>
-              <p className="text-xs text-gray-500 capitalize">{user.role.toLowerCase()}</p>
+          <div className="flex items-center space-x-6">
+            {/* Location Switcher */}
+            <div className="relative group">
+              <div className="flex items-center space-x-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full hover:border-emerald-500 transition-colors cursor-pointer">
+                <i className="fas fa-warehouse text-emerald-600 text-xs"></i>
+                <span className="text-xs font-bold text-slate-700">{activeLocation.name}</span>
+                <i className="fas fa-chevron-down text-[10px] text-slate-400"></i>
+              </div>
+              
+              <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[100] p-2">
+                <p className="px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">Select Operational Site</p>
+                {LOCATIONS.map(loc => (
+                  <button
+                    key={loc.id}
+                    onClick={() => setActiveLocation(loc)}
+                    className={`w-full text-left px-4 py-3 rounded-xl transition-all flex flex-col ${
+                      activeLocation.id === loc.id ? 'bg-emerald-50 text-emerald-700' : 'hover:bg-slate-50 text-slate-600'
+                    }`}
+                  >
+                    <span className="text-sm font-bold">{loc.name}</span>
+                    <span className="text-[10px] opacity-70 truncate">{loc.address}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="h-10 w-10 bg-emerald-100 text-emerald-700 flex items-center justify-center rounded-full font-bold">
-              {user.name.charAt(0)}
+
+            {/* Profile Info */}
+            <div className="flex items-center space-x-4">
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-bold text-gray-900 leading-tight">{user.name}</p>
+                <p className="text-xs text-gray-500 capitalize">{user.role.toLowerCase()}</p>
+              </div>
+              <div className="h-10 w-10 bg-emerald-100 text-emerald-700 flex items-center justify-center rounded-full font-bold border-2 border-white shadow-sm">
+                {user.name.charAt(0)}
+              </div>
             </div>
           </div>
         </header>

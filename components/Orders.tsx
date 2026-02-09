@@ -1,17 +1,19 @@
 
 import React, { useState } from 'react';
-import { Order, OrderStatus, Brand, Product, User, Role, OrderItem } from '../types';
+import { Order, OrderStatus, Brand, Product, User, Role, OrderItem, Location } from '../types';
 
 interface OrdersProps {
   orders: Order[];
   products: Product[];
   currentUser: User;
   activeBrand: Brand;
+  // Added activeLocation to match props passed in App.tsx
+  activeLocation: Location;
   onUpdateStatus: (orderId: string, status: OrderStatus) => void;
   onCreateOrder: (order: Partial<Order>) => void;
 }
 
-const Orders: React.FC<OrdersProps> = ({ orders, products, currentUser, activeBrand, onUpdateStatus, onCreateOrder }) => {
+const Orders: React.FC<OrdersProps> = ({ orders, products, currentUser, activeBrand, activeLocation, onUpdateStatus, onCreateOrder }) => {
   const [showCreate, setShowCreate] = useState(false);
   const [showQuote, setShowQuote] = useState<Order | null>(null);
   

@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
-import { User, Role, Brand, Product, Order, OrderStatus, LogEntry } from './types';
-import { INITIAL_USERS, INITIAL_PRODUCTS, INITIAL_ORDERS, BRANDS } from './constants';
+import { User, Role, Brand, Product, Order, OrderStatus, LogEntry, Location } from './types';
+import { INITIAL_USERS, INITIAL_PRODUCTS, INITIAL_ORDERS, BRANDS, LOCATIONS } from './constants';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import Orders from './components/Orders';
@@ -11,6 +10,7 @@ import Reports from './components/Reports';
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [activeBrand, setActiveBrand] = useState<Brand>(BRANDS[0]);
+  const [activeLocation, setActiveLocation] = useState<Location>(LOCATIONS[0]);
   const [currentView, setCurrentView] = useState('dashboard');
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
@@ -30,7 +30,7 @@ const App: React.FC = () => {
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
 
-    // Logic: Sales logged when confirmed
+    // Fulfill from the order's designated location
     if (status === OrderStatus.CONFIRMED && order.status !== OrderStatus.CONFIRMED) {
       setProducts(prevProducts => {
         return prevProducts.map(p => {
@@ -40,16 +40,22 @@ const App: React.FC = () => {
               id: `log-${Date.now()}-${Math.random()}`,
               type: 'SALE',
               eventNumber: order.id,
-              change: `Sold ${item.quantity} ${p.unit}`,
+              change: `Sold ${item.quantity} ${p.unit} from ${order.locationId}`,
               date: new Date().toISOString(),
               quantity: `${item.quantity} ${p.unit}`,
               userId: user?.id || 'sys',
               userName: user?.name || 'System',
-              authorizerName: user?.name || 'System'
+              authorizerName: user?.name || 'System',
+              locationId: order.locationId
             };
+            
+            const currentStock = p.locationStocks[order.locationId] || 0;
             return {
               ...p,
-              stock: p.stock - item.quantity,
+              locationStocks: {
+                ...p.locationStocks,
+                [order.locationId]: currentStock - item.quantity
+              },
               history: [...p.history, newLog]
             };
           }
@@ -65,6 +71,7 @@ const App: React.FC = () => {
     const newOrder: Order = {
       id: `ORD-${Math.floor(Math.random() * 900) + 100}`,
       brand: activeBrand,
+      locationId: activeLocation.id, // Linked to current session location
       creatorId: user?.id || '',
       creatorName: user?.name || '',
       clientName: orderData.clientName || '',
@@ -81,22 +88,27 @@ const App: React.FC = () => {
   const updateStock = (productId: string, newStock: number) => {
     setProducts(prev => prev.map(p => {
       if (p.id === productId) {
-        const added = newStock - p.stock;
+        const oldStock = p.locationStocks[activeLocation.id] || 0;
+        const added = newStock - oldStock;
         const eventNum = `REST-${Math.floor(1000 + Math.random() * 9000)}`;
         const newLog: LogEntry = {
           id: `log-${Date.now()}`,
           type: 'RESTOCK',
           eventNumber: eventNum,
-          change: `Restock of ${added} units`,
+          change: `Restock of ${added} units at ${activeLocation.name}`,
           date: new Date().toISOString(),
           quantity: `${added} ${p.unit}`,
           userId: user?.id || 'sys',
           userName: user?.name || 'System',
-          authorizerName: user?.name || 'System'
+          authorizerName: user?.name || 'System',
+          locationId: activeLocation.id
         };
         return { 
           ...p, 
-          stock: newStock, 
+          locationStocks: {
+            ...p.locationStocks,
+            [activeLocation.id]: newStock
+          },
           lastRestockAmount: added > 0 ? added : p.lastRestockAmount,
           history: [...p.history, newLog] 
         };
@@ -123,6 +135,149 @@ const App: React.FC = () => {
           ...p, 
           price: newPrice, 
           history: [...p.history, newLog] 
+        };
+      }
+      return p;
+    }));
+  };
+
+  const bulkUpdateInventory = (
+    updates: { productId: string, addedStock: number, newPrice: number }[], 
+    batchNumber: string,
+    sourceLocationId?: string,
+    purchaseOrder?: string
+  ) => {
+    setProducts(prev => prev.map(p => {
+      const update = updates.find(u => u.productId === p.id);
+      if (update) {
+        let newHistory = [...p.history];
+        let newLocationStocks = { ...p.locationStocks };
+        let newPrice = p.price;
+        let lastRestock = p.lastRestockAmount;
+
+        if (update.addedStock !== 0) {
+          const isTransfer = sourceLocationId && sourceLocationId !== 'restock';
+          const sourceLoc = isTransfer ? LOCATIONS.find(l => l.id === sourceLocationId) : null;
+          
+          const restockLog: LogEntry = {
+            id: `log-bulk-rest-${p.id}-${Date.now()}`,
+            type: 'RESTOCK',
+            eventNumber: isTransfer ? batchNumber : (purchaseOrder || batchNumber),
+            change: isTransfer 
+              ? `Stock transfer: ${update.addedStock} units from ${sourceLoc?.name} to ${activeLocation.name}`
+              : `Bulk restock of ${update.addedStock} units at ${activeLocation.name} (PO: ${purchaseOrder || 'N/A'})`,
+            date: new Date().toISOString(),
+            quantity: `${update.addedStock} ${p.unit}`,
+            userId: user?.id || 'sys',
+            userName: user?.name || 'System',
+            authorizerName: user?.name || 'System',
+            locationId: activeLocation.id
+          };
+          newHistory.push(restockLog);
+          
+          // Add to target
+          newLocationStocks[activeLocation.id] = (newLocationStocks[activeLocation.id] || 0) + update.addedStock;
+          
+          // Subtract from source if it's a transfer
+          if (isTransfer) {
+            newLocationStocks[sourceLocationId] = (newLocationStocks[sourceLocationId] || 0) - update.addedStock;
+            
+            // Log subtraction at source
+            const transferOutLog: LogEntry = {
+              id: `log-transfer-out-${p.id}-${Date.now()}`,
+              type: 'SALE',
+              eventNumber: batchNumber,
+              change: `Stock transfer: ${update.addedStock} units moved to ${activeLocation.name}`,
+              date: new Date().toISOString(),
+              quantity: `${update.addedStock} ${p.unit}`,
+              userId: user?.id || 'sys',
+              userName: user?.name || 'System',
+              authorizerName: user?.name || 'System',
+              locationId: sourceLocationId
+            };
+            newHistory.push(transferOutLog);
+          }
+
+          if (update.addedStock > 0) lastRestock = update.addedStock;
+        }
+
+        if (update.newPrice !== p.price) {
+          const priceLog: LogEntry = {
+            id: `log-bulk-prc-${p.id}-${Date.now()}`,
+            type: 'PRICE_CHANGE',
+            eventNumber: batchNumber,
+            change: `$${p.price.toFixed(2)} -> $${update.newPrice.toFixed(2)}`,
+            date: new Date().toISOString(),
+            quantity: `$${update.newPrice.toFixed(2)}`,
+            userId: user?.id || 'sys',
+            userName: user?.name || 'System',
+            authorizerName: user?.name || 'System'
+          };
+          newHistory.push(priceLog);
+          newPrice = update.newPrice;
+        }
+
+        return {
+          ...p,
+          locationStocks: newLocationStocks,
+          price: newPrice,
+          lastRestockAmount: lastRestock,
+          history: newHistory
+        };
+      }
+      return p;
+    }));
+  };
+
+  const createCatalogProduct = (productData: Partial<Product>) => {
+    const eventNum = `CAT-${Math.floor(100 + Math.random() * 899)}`;
+    const creationLog: LogEntry = {
+      id: `log-creation-${Date.now()}`,
+      type: 'CATALOG_CREATE',
+      eventNumber: eventNum,
+      change: `Product defined in catalog: ${productData.name}`,
+      date: new Date().toISOString(),
+      userId: user?.id || 'sys',
+      userName: user?.name || 'System',
+      authorizerName: user?.name || 'System'
+    };
+
+    const newProduct: Product = {
+      id: productData.id || `p-${Date.now()}`,
+      brand: productData.brand || BRANDS[0],
+      name: productData.name || 'New Product',
+      price: productData.price || 0,
+      locationStocks: {}, // Starts empty for all locations
+      lastRestockAmount: 0,
+      unit: productData.unit || 'units',
+      category: productData.category || 'General',
+      status: productData.status || 'ACTIVE',
+      observations: productData.observations || '',
+      history: [creationLog]
+    };
+
+    setProducts(prev => [...prev, newProduct]);
+  };
+
+  const updateCatalogProduct = (productData: Product) => {
+    const eventNum = `CAT-${Math.floor(100 + Math.random() * 899)}`;
+    const updateLog: LogEntry = {
+      id: `log-update-${Date.now()}`,
+      type: 'CATALOG_UPDATE',
+      eventNumber: eventNum,
+      change: `Catalog information updated for: ${productData.name}`,
+      date: new Date().toISOString(),
+      userId: user?.id || 'sys',
+      userName: user?.name || 'System',
+      authorizerName: user?.name || 'System'
+    };
+
+    setProducts(prev => prev.map(p => {
+      if (p.id === productData.id) {
+        return {
+          ...p,
+          ...productData,
+          history: [...p.history, updateLog]
         };
       }
       return p;
@@ -165,16 +320,19 @@ const App: React.FC = () => {
       onLogout={handleLogout} 
       activeBrand={activeBrand} 
       setActiveBrand={setActiveBrand}
+      activeLocation={activeLocation}
+      setActiveLocation={setActiveLocation}
       currentView={currentView}
       setCurrentView={setCurrentView}
     >
-      {currentView === 'dashboard' && <Dashboard orders={orders} products={products} activeBrand={activeBrand} />}
+      {currentView === 'dashboard' && <Dashboard orders={orders} products={products} activeBrand={activeBrand} activeLocation={activeLocation} />}
       {currentView === 'orders' && (
         <Orders 
           orders={orders} 
           products={products} 
           currentUser={user} 
           activeBrand={activeBrand}
+          activeLocation={activeLocation}
           onUpdateStatus={updateOrderStatus}
           onCreateOrder={createOrder}
         />
@@ -184,8 +342,12 @@ const App: React.FC = () => {
           products={products} 
           currentUser={user} 
           activeBrand={activeBrand} 
+          activeLocation={activeLocation}
           onUpdateStock={updateStock}
           onUpdatePrice={updatePrice}
+          onBulkUpdate={bulkUpdateInventory}
+          onAddProduct={createCatalogProduct}
+          onUpdateProduct={updateCatalogProduct}
         />
       )}
       {currentView === 'reports' && <Reports orders={orders} products={products} activeBrand={activeBrand} />}

@@ -16,16 +16,23 @@ export enum OrderStatus {
   REJECTED = 'REJECTED'
 }
 
+export interface Location {
+  id: string;
+  name: string;
+  address: string;
+}
+
 export interface LogEntry {
   id: string;
-  type: 'RESTOCK' | 'SALE' | 'PRICE_CHANGE';
-  eventNumber: string; // e.g., "REST-1024", "ORD-552", "PRC-A92"
-  change: string;      // descriptive summary
+  type: 'RESTOCK' | 'SALE' | 'PRICE_CHANGE' | 'CATALOG_CREATE' | 'CATALOG_UPDATE';
+  eventNumber: string; 
+  change: string;      
   date: string;
-  quantity?: string;   // specific quantity change
-  authorizerName?: string; // Name of user who authorized (specifically for price changes)
+  quantity?: string;   
+  authorizerName?: string; 
   userId: string;
   userName: string;
+  locationId?: string; // Track where the event happened
 }
 
 export interface User {
@@ -43,11 +50,14 @@ export interface Product {
   brand: Brand;
   name: string;
   price: number;
-  stock: number;
+  // Stock is now a map of locationId -> quantity
+  locationStocks: Record<string, number>; 
   lastRestockAmount: number;
   unit: string;
   category: string;
   history: LogEntry[];
+  status: 'ACTIVE' | 'INACTIVE' | 'DELETED';
+  observations?: string;
 }
 
 export interface OrderItem {
@@ -60,6 +70,7 @@ export interface OrderItem {
 export interface Order {
   id: string;
   brand: Brand;
+  locationId: string; // Fulfillment location
   creatorId: string;
   creatorName: string;
   clientName: string;

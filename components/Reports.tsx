@@ -17,12 +17,13 @@ const Reports: React.FC<ReportsProps> = ({ orders, products, activeBrand }) => {
 
   const fetchDataInsights = async () => {
     setLoading(true);
+    // Fixed: Property 'stock' does not exist on type 'Product'. Summing locationStocks to get total stock for the brand report.
     const brandData = {
       brand: activeBrand,
       period,
       totalSales: orders.filter(o => o.brand === activeBrand).length,
       revenue: orders.filter(o => o.brand === activeBrand).reduce((s, o) => s + o.total, 0),
-      lowStockItems: products.filter(p => p.brand === activeBrand && p.stock < 100).length
+      lowStockItems: products.filter(p => p.brand === activeBrand && Object.values(p.locationStocks).reduce((sum, qty) => sum + qty, 0) < 100).length
     };
     const res = await getReportInsights(brandData);
     setInsights(res);
