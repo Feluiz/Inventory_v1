@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { User, Role, Brand, Product, Order, OrderStatus, LogEntry, Location } from './types';
 import { INITIAL_USERS, INITIAL_PRODUCTS, INITIAL_ORDERS, BRANDS, LOCATIONS } from './constants';
@@ -6,6 +7,7 @@ import Dashboard from './components/Dashboard';
 import Orders from './components/Orders';
 import Inventory from './components/Inventory';
 import Reports from './components/Reports';
+import Employees from './components/Employees';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -22,7 +24,6 @@ const App: React.FC = () => {
   }, [user]);
 
   const handleLogout = () => {
-    alert("Logged out successfully");
     setUser(null);
   };
 
@@ -30,7 +31,6 @@ const App: React.FC = () => {
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
 
-    // Fulfill from the order's designated location
     if (status === OrderStatus.CONFIRMED && order.status !== OrderStatus.CONFIRMED) {
       setProducts(prevProducts => {
         return prevProducts.map(p => {
@@ -71,7 +71,7 @@ const App: React.FC = () => {
     const newOrder: Order = {
       id: `ORD-${Math.floor(Math.random() * 900) + 100}`,
       brand: activeBrand,
-      locationId: activeLocation.id, // Linked to current session location
+      locationId: activeLocation.id,
       creatorId: user?.id || '',
       creatorName: user?.name || '',
       clientName: orderData.clientName || '',
@@ -174,15 +174,10 @@ const App: React.FC = () => {
             locationId: activeLocation.id
           };
           newHistory.push(restockLog);
-          
-          // Add to target
           newLocationStocks[activeLocation.id] = (newLocationStocks[activeLocation.id] || 0) + update.addedStock;
           
-          // Subtract from source if it's a transfer
           if (isTransfer) {
             newLocationStocks[sourceLocationId] = (newLocationStocks[sourceLocationId] || 0) - update.addedStock;
-            
-            // Log subtraction at source
             const transferOutLog: LogEntry = {
               id: `log-transfer-out-${p.id}-${Date.now()}`,
               type: 'SALE',
@@ -247,7 +242,7 @@ const App: React.FC = () => {
       brand: productData.brand || BRANDS[0],
       name: productData.name || 'New Product',
       price: productData.price || 0,
-      locationStocks: {}, // Starts empty for all locations
+      locationStocks: {},
       lastRestockAmount: 0,
       unit: productData.unit || 'units',
       category: productData.category || 'General',
@@ -274,39 +269,44 @@ const App: React.FC = () => {
 
     setProducts(prev => prev.map(p => {
       if (p.id === productData.id) {
-        return {
-          ...p,
-          ...productData,
-          history: [...p.history, updateLog]
-        };
+        return { ...p, ...productData, history: [...p.history, updateLog] };
       }
       return p;
     }));
   };
 
+  const handleAddUser = (newUser: User) => {
+    setAllUsers(prev => [...prev, newUser]);
+  };
+
+  const handleUpdateUser = (updatedUser: User) => {
+    setAllUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+    if (user?.id === updatedUser.id) setUser(updatedUser);
+  };
+
   if (!user) return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#3e2a24] flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl space-y-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900">Don Rafa Group</h1>
-          <p className="text-gray-500 mt-2">Inventory Management System</p>
+          <h1 className="text-3xl font-bold text-[#5b3d35]">Don Rafa Group</h1>
+          <p className="text-gray-500 mt-2">Coffee Logistics & ERP</p>
         </div>
         <div className="space-y-4">
-          <p className="text-sm font-medium text-gray-700 text-center">Demo: Select a profile to enter</p>
-          {INITIAL_USERS.map(u => (
+          <p className="text-sm font-medium text-gray-700 text-center uppercase tracking-widest text-[10px]">Select Profile to Enter</p>
+          {allUsers.map(u => (
             <button
               key={u.id}
               onClick={() => {
                 setUser(u);
                 setActiveBrand(u.brands[0]);
               }}
-              className="w-full p-4 border border-gray-200 rounded-xl hover:bg-emerald-50 hover:border-emerald-200 transition-all text-left flex items-center justify-between group"
+              className="w-full p-4 border border-gray-100 rounded-xl hover:bg-[#5b3d35]/5 hover:border-[#5b3d35]/30 transition-all text-left flex items-center justify-between group"
             >
               <div>
-                <p className="font-bold text-gray-900">{u.name}</p>
-                <p className="text-xs text-gray-500 capitalize">{u.role.toLowerCase()}</p>
+                <p className="font-bold text-gray-900">{u.firstName} {u.lastName}</p>
+                <p className="text-[10px] text-gray-500 uppercase tracking-tighter">{u.role} | #{u.id}</p>
               </div>
-              <i className="fas fa-chevron-right text-gray-300 group-hover:text-emerald-500"></i>
+              <i className="fas fa-chevron-right text-gray-300 group-hover:text-[#5b3d35]"></i>
             </button>
           ))}
         </div>
@@ -353,43 +353,11 @@ const App: React.FC = () => {
       {currentView === 'reports' && <Reports orders={orders} products={products} activeBrand={activeBrand} />}
       
       {currentView === 'employees' && user.role === Role.ADMIN && (
-        <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold text-gray-800">Employee Directory</h2>
-            <button className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-800 transition-all">Add New Employee</button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {allUsers.map(u => (
-              <div key={u.id} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm relative group overflow-hidden hover:border-emerald-200 transition-all">
-                <div className="flex items-center space-x-4">
-                  <div className="h-12 w-12 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center font-bold text-xl">
-                    {u.name.charAt(0)}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-900">{u.name}</h3>
-                    <p className="text-xs text-gray-500">{u.department}</p>
-                  </div>
-                </div>
-                <div className="mt-4 space-y-2">
-                  <div className="flex items-center text-xs text-gray-500">
-                    <i className="fas fa-envelope w-5 text-slate-300"></i> {u.email}
-                  </div>
-                  <div className="flex items-center text-xs text-gray-500">
-                    <i className="fas fa-shield-halved w-5 text-slate-300"></i> {u.role}
-                  </div>
-                </div>
-                <div className="mt-4 pt-4 border-t border-gray-50 flex flex-wrap gap-1">
-                  {u.brands.map(b => (
-                    <span key={b} className="px-2 py-0.5 bg-gray-100 text-[10px] font-bold text-gray-600 rounded uppercase">{b}</span>
-                  ))}
-                </div>
-                <button className="absolute top-4 right-4 text-gray-300 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <i className="fas fa-ellipsis-v"></i>
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
+        <Employees 
+          users={allUsers}
+          onAddUser={handleAddUser}
+          onUpdateUser={handleUpdateUser}
+        />
       )}
     </Layout>
   );

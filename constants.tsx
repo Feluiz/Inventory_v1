@@ -3,6 +3,17 @@ import { Brand, Permission, Role, OrderStatus, Product, User, Order, Location } 
 
 export const BRANDS: Brand[] = ['Finca Don Rafa', 'Yuteco', 'Ecotact'];
 
+export const PRIMARY_COLOR = '#5b3d35';
+export const PRIMARY_COLOR_LIGHT = '#7a5247';
+
+export const DEPARTMENTS = [
+  'production',
+  'management',
+  'sales',
+  'operations',
+  'direction'
+];
+
 export const LOCATIONS: Location[] = [
   { id: 'loc-1', name: 'Main Warehouse (Chiapas)', address: 'Industrial Zone, Chiapas' },
   { id: 'loc-2', name: 'Distribution Center (Mexico City)', address: 'Central North, CDMX' },
@@ -10,15 +21,15 @@ export const LOCATIONS: Location[] = [
 ];
 
 export const BRAND_COLORS: Record<Brand, string> = {
-  'Finca Don Rafa': 'bg-emerald-600',
-  'Yuteco': 'bg-amber-600',
-  'Ecotact': 'bg-sky-600',
+  'Finca Don Rafa': 'bg-[#5b3d35]',
+  'Yuteco': 'bg-[#926c44]',
+  'Ecotact': 'bg-[#4a6741]',
 };
 
 export const BRAND_HEX: Record<Brand, string> = {
-  'Finca Don Rafa': '#059669',
-  'Yuteco': '#d97706',
-  'Ecotact': '#0284c7',
+  'Finca Don Rafa': '#5b3d35',
+  'Yuteco': '#926c44',
+  'Ecotact': '#4a6741',
 };
 
 export const PERMISSIONS: Permission[] = [
@@ -31,34 +42,42 @@ export const PERMISSIONS: Permission[] = [
   { id: 'create_custom_reports', label: 'Configure Reports', category: 'Reports' },
 ];
 
-// Added INITIAL_USERS to fix the import error in App.tsx
 export const INITIAL_USERS: User[] = [
   {
-    id: 'u1',
+    id: '1001',
+    firstName: 'Roberto',
+    lastName: 'Don Rafa',
     name: 'Roberto Don Rafa',
     email: 'roberto@donrafa.com',
     role: Role.ADMIN,
     brands: ['Finca Don Rafa', 'Yuteco', 'Ecotact'],
     permissions: ['create_order', 'approve_order', 'manage_inventory', 'manage_prices', 'manage_users', 'view_reports', 'create_custom_reports'],
-    department: 'Administration'
+    department: 'direction',
+    status: 'Active'
   },
   {
-    id: 'u2',
+    id: '1002',
+    firstName: 'Ana',
+    lastName: 'Manager',
     name: 'Ana Manager',
     email: 'ana@donrafa.com',
     role: Role.MANAGER,
     brands: ['Finca Don Rafa', 'Yuteco'],
     permissions: ['create_order', 'approve_order', 'manage_inventory', 'view_reports'],
-    department: 'Operations'
+    department: 'management',
+    status: 'Active'
   },
   {
-    id: 'u3',
+    id: '1003',
+    firstName: 'Carlos',
+    lastName: 'Employee',
     name: 'Carlos Employee',
     email: 'carlos@donrafa.com',
     role: Role.EMPLOYEE,
     brands: ['Finca Don Rafa'],
     permissions: ['create_order'],
-    department: 'Sales'
+    department: 'sales',
+    status: 'Active'
   }
 ];
 
